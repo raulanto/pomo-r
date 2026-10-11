@@ -44,6 +44,9 @@ fn main() -> anyhow::Result<()> {
                         app.handle(action);
                     }
                 }
+                Event::Mouse(_) => {
+                    // Ignorar eventos de ratón (como scroll de rueda o trackpad)
+                }
                 Event::Resize(_, _) => {
                     // El redibujado se ejecuta automáticamente en la siguiente iteración
                 }

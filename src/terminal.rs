@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crossterm::cursor::{Hide, Show};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -44,7 +45,7 @@ pub fn register_signals() -> io::Result<Arc<AtomicBool>> {
 pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    if let Err(err) = execute!(stdout, EnterAlternateScreen, Hide) {
+    if let Err(err) = execute!(stdout, EnterAlternateScreen, Hide, EnableMouseCapture) {
         let _ = disable_raw_mode();
         return Err(err);
     }
@@ -57,7 +58,7 @@ pub fn restore() -> io::Result<()> {
         return Ok(());
     }
     let mut stdout = io::stdout();
-    let _ = execute!(stdout, LeaveAlternateScreen, Show);
+    let _ = execute!(stdout, LeaveAlternateScreen, Show, DisableMouseCapture);
     let _ = disable_raw_mode();
     Ok(())
 }

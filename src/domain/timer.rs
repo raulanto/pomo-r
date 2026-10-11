@@ -27,6 +27,7 @@ pub struct Timer {
     short_break_duration: Duration,
     long_break_duration: Duration,
     long_break_every: u32,
+    current_phase_duration: Duration,
     last_tick: Option<Instant>,
 }
 
@@ -62,6 +63,7 @@ impl Timer {
             short_break_duration: short,
             long_break_duration: long,
             long_break_every: cycles,
+            current_phase_duration: work,
             last_tick: None,
         }
     }
@@ -112,7 +114,7 @@ impl Timer {
 
     #[allow(dead_code)]
     pub fn total_duration(&self) -> Duration {
-        self.duration_for_phase(self.phase)
+        self.current_phase_duration
     }
 
     pub fn start(&mut self) {
@@ -137,14 +139,18 @@ impl Timer {
     }
 
     pub fn reset(&mut self) {
-        self.remaining = self.duration_for_phase(self.phase);
+        let dur = self.duration_for_phase(self.phase);
+        self.remaining = dur;
+        self.current_phase_duration = dur;
         self.status = Status::Idle;
         self.last_tick = None;
     }
 
     pub fn select_phase(&mut self, phase: Phase) {
+        let dur = self.duration_for_phase(phase);
         self.phase = phase;
-        self.remaining = self.duration_for_phase(phase);
+        self.remaining = dur;
+        self.current_phase_duration = dur;
         self.status = Status::Idle;
         self.last_tick = None;
     }
@@ -162,9 +168,16 @@ impl Timer {
         if delta_minutes > 0 {
             let add = Duration::from_secs((delta_minutes as u64) * 60);
             self.remaining = self.remaining.saturating_add(add);
+            self.current_phase_duration = self.current_phase_duration.saturating_add(add);
         } else if delta_minutes < 0 {
             let sub = Duration::from_secs((-delta_minutes as u64) * 60);
+            let prev_remaining = self.remaining;
             self.remaining = self.remaining.saturating_sub(sub).max(one_min);
+            let actual_sub = prev_remaining.saturating_sub(self.remaining);
+            self.current_phase_duration = self
+                .current_phase_duration
+                .saturating_sub(actual_sub)
+                .max(self.remaining);
         }
     }
 
@@ -208,7 +221,9 @@ impl Timer {
             };
 
             self.phase = next_phase;
-            self.remaining = self.duration_for_phase(next_phase);
+            let next_dur = self.duration_for_phase(next_phase);
+            self.remaining = next_dur;
+            self.current_phase_duration = next_dur;
             self.status = Status::Idle;
             self.last_tick = None;
 
@@ -435,5 +450,22 @@ mod tests {
         timer.tick(t0 + Duration::from_secs(13));
         // Only 1s before pause + 2s after pause = 3s total elapsed
         assert_eq!(timer.remaining(), Duration::from_secs(25 * 60 - 3));
+    }
+
+    #[test]
+    fn test_adjust_updates_total_duration_and_progress() {
+        let mut timer = create_test_timer();
+        assert_eq!(timer.total_duration(), Duration::from_secs(25 * 60));
+        assert_eq!(timer.remaining(), Duration::from_secs(25 * 60));
+
+        // Adjust +5 min before starting
+        timer.adjust(5);
+        assert_eq!(timer.total_duration(), Duration::from_secs(30 * 60));
+        assert_eq!(timer.remaining(), Duration::from_secs(30 * 60));
+
+        // Adjust -10 min
+        timer.adjust(-10);
+        assert_eq!(timer.total_duration(), Duration::from_secs(20 * 60));
+        assert_eq!(timer.remaining(), Duration::from_secs(20 * 60));
     }
 }
