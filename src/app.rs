@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use crate::config::Config;
 use crate::domain::{PhaseFinished, Timer};
 use crate::input::Action;
 
@@ -15,19 +16,25 @@ pub struct App {
 
 impl Default for App {
     fn default() -> Self {
-        Self::new(Timer::default())
+        Self::new(Config::default())
     }
 }
 
 impl App {
-    pub fn new(timer: Timer) -> Self {
+    pub fn new(config: Config) -> Self {
+        let timer = Timer::new(
+            Duration::from_secs(config.work_minutes * 60),
+            Duration::from_secs(config.short_break_minutes * 60),
+            Duration::from_secs(config.long_break_minutes * 60),
+            config.long_break_every,
+        );
         Self {
             timer,
             show_help: false,
-            bell: true,
+            bell: config.bell,
             should_quit: false,
             message: None,
-            auto_start_next: false,
+            auto_start_next: config.auto_start_next,
             redraw_requested: false,
         }
     }
