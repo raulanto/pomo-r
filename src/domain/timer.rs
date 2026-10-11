@@ -82,18 +82,22 @@ impl Timer {
         self.completed_pomodoros
     }
 
+    #[allow(dead_code)]
     pub fn long_break_every(&self) -> u32 {
         self.long_break_every
     }
 
+    #[allow(dead_code)]
     pub fn work_duration(&self) -> Duration {
         self.work_duration
     }
 
+    #[allow(dead_code)]
     pub fn short_break_duration(&self) -> Duration {
         self.short_break_duration
     }
 
+    #[allow(dead_code)]
     pub fn long_break_duration(&self) -> Duration {
         self.long_break_duration
     }
@@ -106,6 +110,7 @@ impl Timer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn total_duration(&self) -> Duration {
         self.duration_for_phase(self.phase)
     }

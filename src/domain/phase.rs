@@ -17,6 +17,7 @@ impl Phase {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_break(&self) -> bool {
         matches!(self, Phase::ShortBreak | Phase::LongBreak)
     }
