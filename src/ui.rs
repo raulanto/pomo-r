@@ -1,50 +1,59 @@
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Gauge, Paragraph, Row, Table};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Row, Table};
 use ratatui::Frame;
 
 use crate::app::App;
 use crate::domain::{Phase, Status};
 
-pub fn render(frame: &mut Frame, app: &App) {
-    let area = frame.area();
-
-    // En pantallas muy pequeñas, mostrar vista mínima para evitar rotura o panic
-    if area.width < 32 || area.height < 8 {
-        render_minimal(frame, app, area);
-        return;
-    }
-
-    render_full(frame, app, area);
-
-    if app.show_help {
-        render_help_popup(frame, area);
-    }
-}
-
+// Usa los colores ANSI del tema activo en la terminal (respeta Catppuccin,
+// Gruvbox, Tokyo Night, etc. configurados en Omarchy/Alacritty).
 fn phase_color(phase: Phase) -> Color {
     match phase {
         Phase::Work => Color::Red,
         Phase::ShortBreak => Color::Green,
-        Phase::LongBreak => Color::Cyan,
+        Phase::LongBreak => Color::Blue,
     }
 }
 
-fn digit_3x3(c: char) -> [&'static str; 3] {
+fn phase_icon(phase: Phase) -> &'static str {
+    match phase {
+        Phase::Work => "🍅",
+        Phase::ShortBreak => "☕",
+        Phase::LongBreak => "🌿",
+    }
+}
+
+// Dígitos grandes 5×3 con bordes dobles
+fn digit_5x3(c: char) -> [&'static str; 5] {
     match c {
-        '0' => ["┌─┐", "│ │", "└─┘"],
-        '1' => [" ┐ ", " │ ", " ┴ "],
-        '2' => ["┌─┐", "┌─┘", "└──"],
-        '3' => ["┌─┐", " ─┤", "──┘"],
-        '4' => ["│ │", "└─┤", "  │"],
-        '5' => ["┌──", "└─┐", "──┘"],
-        '6' => ["┌──", "├─┐", "└─┘"],
-        '7' => ["──┐", "  │", "  │"],
-        '8' => ["┌─┐", "├─┤", "└─┘"],
-        '9' => ["┌─┐", "└─┤", "──┘"],
-        ':' => ["   ", " · ", "   "],
-        _ => ["   ", "   ", "   "],
+        '0' => ["╔═══╗", "║   ║", "║   ║", "║   ║", "╚═══╝"],
+        '1' => ["  ╗  ", "  ║  ", "  ║  ", "  ║  ", "  ╩  "],
+        '2' => ["╔═══╗", "    ║", "╔═══╝", "║    ", "╚═══╝"],
+        '3' => ["╔═══╗", "    ║", " ═══╣", "    ║", "╚═══╝"],
+        '4' => ["║   ║", "║   ║", "╚═══╣", "    ║", "    ╩"],
+        '5' => ["╔════", "║    ", "╚═══╗", "    ║", "╚═══╝"],
+        '6' => ["╔════", "║    ", "╠═══╗", "║   ║", "╚═══╝"],
+        '7' => ["╔═══╗", "    ║", "    ║", "    ║", "    ╩"],
+        '8' => ["╔═══╗", "║   ║", "╠═══╣", "║   ║", "╚═══╝"],
+        '9' => ["╔═══╗", "║   ║", "╚═══╣", "    ║", "╚═══╝"],
+        ':' => ["     ", "  ●  ", "     ", "  ●  ", "     "],
+        _ => ["     ", "     ", "     ", "     ", "     "],
+    }
+}
+
+pub fn render(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+
+    if area.width < 32 || area.height < 8 {
+        render_minimal(frame, app, area);
+    } else {
+        render_full(frame, app, area);
+    }
+
+    if app.show_help {
+        render_help_popup(frame, area);
     }
 }
 
@@ -56,7 +65,7 @@ fn render_minimal(frame: &mut Frame, app: &App, area: Rect) {
     let status_sym = match app.timer.status() {
         Status::Running => "▶",
         Status::Paused => "⏸",
-        Status::Idle => "⏹",
+        Status::Idle => "·",
     };
 
     let lines = vec![
@@ -64,154 +73,196 @@ fn render_minimal(frame: &mut Frame, app: &App, area: Rect) {
             format!("{:02}:{:02}", mins, secs),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         )),
-        Line::from(Span::raw(format!(
-            "{} {}",
-            status_sym,
-            app.timer.phase().label()
-        ))),
+        Line::from(Span::styled(
+            format!("{} {}", status_sym, app.timer.phase().label()),
+            Style::default().fg(color),
+        )),
     ];
 
-    let paragraph = Paragraph::new(lines).alignment(Alignment::Center);
-    frame.render_widget(paragraph, area);
+    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), area);
 }
 
 fn render_full(frame: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::vertical([
-        Constraint::Length(3), // 1. Cabecera
-        Constraint::Min(4),    // 2. Centro (tiempo grande + gauge)
-        Constraint::Length(2), // 3. Estado y pomodoros
-        Constraint::Length(1), // 4. Pie
+    let color = phase_color(app.timer.phase());
+
+    let main_chunks = Layout::vertical([
+        Constraint::Length(3), // Header
+        Constraint::Min(7),    // Centro (tiempo + barra)
+        Constraint::Length(3), // Estado + pomodoros
+        Constraint::Length(1), // Footer
     ])
     .split(area);
 
-    let color = phase_color(app.timer.phase());
+    render_header(frame, app, main_chunks[0], color);
+    render_center(frame, app, main_chunks[1], color);
+    render_status(frame, app, main_chunks[2], color);
+    render_footer(frame, app, main_chunks[3]);
+}
 
-    // 1. Cabecera
-    let header_text = Line::from(vec![
+fn render_header(frame: &mut Frame, app: &App, area: Rect, color: Color) {
+    let block = Block::default()
+        .borders(Borders::BOTTOM)
+        .border_type(BorderType::Plain)
+        // Color::DarkGray es el color #8 del tema: se adapta solo
+        .border_style(Style::default().fg(Color::DarkGray));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let completed = app.timer.completed_pomodoros();
+    let line = Line::from(vec![
         Span::styled(" pomo ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("— "),
+        Span::styled("·", Style::default().fg(Color::DarkGray)),
+        Span::raw(" "),
+        Span::raw(phase_icon(app.timer.phase())),
+        Span::raw(" "),
         Span::styled(
-            format!(" {} ", app.timer.phase().label()),
+            app.timer.phase().label(),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
+        Span::raw("  "),
+        Span::styled(
+            format!("({})", completed),
+            Style::default().fg(Color::DarkGray),
+        ),
     ]);
-    let header = Paragraph::new(header_text)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::BOTTOM));
-    frame.render_widget(header, chunks[0]);
 
-    // 2. Centro: Tiempo + Gauge
-    let center_area = chunks[1];
+    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), inner);
+}
+
+fn render_center(frame: &mut Frame, app: &App, area: Rect, color: Color) {
     let mins = app.timer.remaining().as_secs() / 60;
     let secs = app.timer.remaining().as_secs() % 60;
+    let use_big_digits = area.height >= 9 && area.width >= 52 && mins <= 99;
 
-    let use_big_digits = center_area.height >= 6 && center_area.width >= 35 && mins <= 99;
-
-    let center_chunks = Layout::vertical([
-        Constraint::Min(3),                                              // Tiempo
-        Constraint::Length(if center_area.height >= 8 { 3 } else { 1 }), // Gauge
-    ])
-    .split(center_area);
-
-    if use_big_digits {
-        let time_str = format!("{:02}:{:02}", mins, secs);
-        let chars: Vec<char> = time_str.chars().collect();
-        let g: Vec<[&'static str; 3]> = chars.iter().map(|&c| digit_3x3(c)).collect();
-
-        let l0 = format!(
-            "{} {} {} {} {}",
-            g[0][0], g[1][0], g[2][0], g[3][0], g[4][0]
-        );
-        let l1 = format!(
-            "{} {} {} {} {}",
-            g[0][1], g[1][1], g[2][1], g[3][1], g[4][1]
-        );
-        let l2 = format!(
-            "{} {} {} {} {}",
-            g[0][2], g[1][2], g[2][2], g[3][2], g[4][2]
-        );
-
-        let time_lines = vec![
-            Line::from(Span::styled(
-                l0,
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                l1,
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                l2,
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            )),
-        ];
-        let time_widget = Paragraph::new(time_lines).alignment(Alignment::Center);
-        frame.render_widget(time_widget, center_chunks[0]);
-    } else {
-        let time_text = format!("{:02}:{:02}", mins, secs);
-        let time_widget = Paragraph::new(Line::from(Span::styled(
-            time_text,
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )))
-        .alignment(Alignment::Center);
-        frame.render_widget(time_widget, center_chunks[0]);
-    }
-
-    // Gauge de progreso
     let total_secs = app.timer.total_duration().as_secs_f64();
     let remaining_secs = app.timer.remaining().as_secs_f64();
-    let elapsed_secs = (total_secs - remaining_secs).max(0.0);
+    let elapsed = (total_secs - remaining_secs).max(0.0);
     let ratio = if total_secs > 0.0 {
-        (elapsed_secs / total_secs).clamp(0.0, 1.0)
+        (elapsed / total_secs).clamp(0.0, 1.0)
     } else {
         0.0
     };
-    let percent = (ratio * 100.0) as u16;
 
-    let mut gauge = Gauge::default()
-        .gauge_style(Style::default().fg(color))
-        .ratio(ratio)
-        .label(format!("{}%", percent));
+    let time_height = if use_big_digits { 5 } else { 1 };
+    let gauge_height = if area.height >= 10 { 3 } else { 1 };
+    let spacer = if area.height >= 12 { 1 } else { 0 };
 
-    if center_area.height >= 8 {
-        gauge = gauge.block(Block::default().borders(Borders::ALL).title(" Progreso "));
+    let center_chunks = Layout::vertical([
+        Constraint::Min(time_height),
+        Constraint::Length(spacer),
+        Constraint::Length(gauge_height),
+    ])
+    .split(area);
+
+    // Tiempo grande
+    if use_big_digits {
+        let time_str = format!("{:02}:{:02}", mins, secs);
+        let chars: Vec<char> = time_str.chars().collect();
+        let g: Vec<[&'static str; 5]> = chars.iter().map(|&c| digit_5x3(c)).collect();
+        let lines: Vec<Line> = (0..5)
+            .map(|row| {
+                let row_str = g
+                    .iter()
+                    .map(|glyph| glyph[row])
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                Line::from(Span::styled(
+                    row_str,
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ))
+            })
+            .collect();
+        frame.render_widget(
+            Paragraph::new(lines).alignment(Alignment::Center),
+            center_chunks[0],
+        );
+    } else {
+        let time_text = format!("{:02}:{:02}", mins, secs);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                time_text,
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center),
+            center_chunks[0],
+        );
     }
-    frame.render_widget(gauge, center_chunks[1]);
 
-    // 3. Estado y Pomodoros
-    let status_span = match app.timer.status() {
-        Status::Running => Span::styled(
-            "▶ En marcha",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Status::Paused => Span::styled(
-            "⏸ Pausado",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Status::Idle => Span::styled("⏹ Inactivo", Style::default().fg(Color::DarkGray)),
+    // Gauge
+    let percent = (ratio * 100.0) as u16;
+    let gauge = if gauge_height >= 3 {
+        Gauge::default()
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .gauge_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+            .ratio(ratio)
+            .label(format!(" {}% ", percent))
+    } else {
+        Gauge::default()
+            .gauge_style(Style::default().fg(color))
+            .ratio(ratio)
+            .label("")
+    };
+    frame.render_widget(gauge, center_chunks[2]);
+}
+
+fn render_status(frame: &mut Frame, app: &App, area: Rect, color: Color) {
+    let block = Block::default()
+        .borders(Borders::TOP)
+        .border_type(BorderType::Plain)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let (sym, label, status_color) = match app.timer.status() {
+        Status::Running => ("▶", " Corriendo", Color::Green),
+        Status::Paused => ("⏸", " Pausado  ", Color::Yellow),
+        Status::Idle => ("·", " Inactivo ", Color::DarkGray),
     };
 
-    let completed = app.timer.completed_pomodoros();
     let every = app.timer.long_break_every().max(1);
+    let completed = app.timer.completed_pomodoros();
     let in_cycle = completed % every;
     let dots: String = (0..every)
-        .map(|i| if i < in_cycle { '●' } else { '○' })
+        .map(|i| if i < in_cycle { '█' } else { '░' })
         .collect();
 
-    let status_line = Line::from(vec![
-        status_span,
-        Span::raw("   ·   "),
-        Span::raw(format!("🍅 × {}  [{}]", completed, dots)),
-    ]);
-    let status_widget = Paragraph::new(status_line).alignment(Alignment::Center);
-    frame.render_widget(status_widget, chunks[2]);
+    let halves =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(inner);
 
-    // 4. Pie
-    let footer_line = if let Some((msg, _)) = &app.message {
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!(" {} ", sym),
+                Style::default()
+                    .fg(status_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(label, Style::default().fg(status_color)),
+        ]))
+        .alignment(Alignment::Center),
+        halves[0],
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!("🍅 ×{}  ", completed),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("[{}]", dots), Style::default().fg(Color::DarkGray)),
+        ]))
+        .alignment(Alignment::Center),
+        halves[1],
+    );
+}
+
+fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
+    let line = if let Some((msg, _)) = &app.message {
         Line::from(vec![
             Span::styled(
                 "🔔 ",
@@ -219,75 +270,86 @@ fn render_full(frame: &mut Frame, app: &App, area: Rect) {
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(msg, Style::default().fg(Color::Yellow)),
+            Span::styled(msg.as_str(), Style::default().fg(Color::Yellow)),
         ])
     } else {
         Line::from(vec![
-            Span::styled("Space", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" pausa · "),
-            Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" reiniciar · "),
-            Span::styled("n", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" saltar · "),
-            Span::styled("?", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" ayuda · "),
-            Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" salir"),
+            key_hint("Space"),
+            Span::styled(" pausa  ", Style::default().fg(Color::DarkGray)),
+            key_hint("r"),
+            Span::styled(" reiniciar  ", Style::default().fg(Color::DarkGray)),
+            key_hint("n"),
+            Span::styled(" saltar  ", Style::default().fg(Color::DarkGray)),
+            key_hint("+/-"),
+            Span::styled(" ajustar  ", Style::default().fg(Color::DarkGray)),
+            key_hint("?"),
+            Span::styled(" ayuda  ", Style::default().fg(Color::DarkGray)),
+            key_hint("q"),
+            Span::styled(" salir", Style::default().fg(Color::DarkGray)),
         ])
     };
-    let footer_widget = Paragraph::new(footer_line).alignment(Alignment::Center);
-    frame.render_widget(footer_widget, chunks[3]);
+
+    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
+fn key_hint(key: &str) -> Span<'_> {
+    Span::styled(
+        format!("[{}]", key),
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    )
+}
 
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+    let x = r.x.saturating_add(r.width.saturating_sub(width) / 2);
+    let y = r.y.saturating_add(r.height.saturating_sub(height) / 2);
+    Rect {
+        x: x.min(r.right().saturating_sub(1)),
+        y: y.min(r.bottom().saturating_sub(1)),
+        width: width.min(r.width),
+        height: height.min(r.height),
+    }
 }
 
 fn render_help_popup(frame: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(75, 75, area);
+    let popup_width = 62u16.min(area.width);
+    let popup_height = 16u16.min(area.height);
+    let popup_area = centered_rect(popup_width, popup_height, area);
 
     let rows = vec![
-        Row::new(vec!["Ctrl+C, Ctrl+D, q", "Salir"]),
+        Row::new(vec!["Ctrl+C / Ctrl+D / q", "Salir"]),
         Row::new(vec!["Esc", "Cerrar ayuda / Salir"]),
-        Row::new(vec!["Space, Enter", "Iniciar / pausar temporizador"]),
-        Row::new(vec!["r, Ctrl+R", "Reiniciar fase actual"]),
-        Row::new(vec!["n, s, →", "Saltar a la siguiente fase"]),
-        Row::new(vec!["+, ↑", "+1 minuto a la fase actual"]),
-        Row::new(vec!["-, ↓", "-1 minuto a la fase actual"]),
-        Row::new(vec![
-            "1, 2, 3",
-            "Ir a Trabajo / Descanso corto / Descanso largo",
-        ]),
-        Row::new(vec!["b", "Activar / desactivar campana"]),
-        Row::new(vec!["?, h, F1", "Mostrar / ocultar ayuda"]),
+        Row::new(vec!["Space / Enter", "Iniciar / Pausar"]),
+        Row::new(vec!["r / Ctrl+R", "Reiniciar fase actual"]),
+        Row::new(vec!["n / s / →", "Saltar a la siguiente fase"]),
+        Row::new(vec!["+  /  ↑", "+1 minuto"]),
+        Row::new(vec!["-  /  ↓", "-1 minuto"]),
+        Row::new(vec!["1 / 2 / 3", "Trabajo / Descanso corto / Largo"]),
+        Row::new(vec!["b", "Activar/desactivar campana"]),
+        Row::new(vec!["? / h / F1", "Mostrar/ocultar ayuda"]),
         Row::new(vec!["Ctrl+L", "Redibujar pantalla"]),
     ];
 
-    let table = Table::new(rows, [Constraint::Length(22), Constraint::Min(24)])
+    let table = Table::new(rows, [Constraint::Length(22), Constraint::Min(28)])
         .header(
-            Row::new(vec!["Atajo", "Acción"]).style(
+            Row::new(vec!["  Atajo", "Acción"]).style(
                 Style::default()
-                    .add_modifier(Modifier::BOLD)
-                    .fg(Color::Yellow),
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             ),
         )
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Ayuda — Atajos de teclado (Esc o ? para cerrar) "),
-        );
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray))
+                .title(Span::styled(
+                    " ⌨  Atajos · Esc para cerrar ",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+        )
+        .column_spacing(2);
 
     frame.render_widget(Clear, popup_area);
     frame.render_widget(table, popup_area);
@@ -304,7 +366,6 @@ mod tests {
         let backend = TestBackend::new(20, 5);
         let mut terminal = Terminal::new(backend).expect("crear terminal de prueba");
         let app = App::default();
-
         terminal
             .draw(|f| render(f, &app))
             .expect("renderizar en 20x5 sin panic");
@@ -315,7 +376,6 @@ mod tests {
         let backend = TestBackend::new(40, 12);
         let mut terminal = Terminal::new(backend).expect("crear terminal de prueba");
         let app = App::default();
-
         terminal
             .draw(|f| render(f, &app))
             .expect("renderizar en tamaño medio");
@@ -326,18 +386,15 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).expect("crear terminal de prueba");
         let mut app = App::default();
-
         terminal
             .draw(|f| render(f, &app))
             .expect("renderizar en tamaño estándar");
 
-        // Con ayuda abierta
         app.show_help = true;
         terminal
             .draw(|f| render(f, &app))
             .expect("renderizar ayuda");
 
-        // Con mensaje activo
         app.set_message("Test alerta");
         terminal
             .draw(|f| render(f, &app))
@@ -349,12 +406,21 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).expect("crear terminal de prueba");
         let mut app = App::default();
-
         for phase in [Phase::Work, Phase::ShortBreak, Phase::LongBreak] {
             app.timer.select_phase(phase);
             terminal
                 .draw(|f| render(f, &app))
                 .expect("renderizar fases");
         }
+    }
+
+    #[test]
+    fn test_render_large_size() {
+        let backend = TestBackend::new(120, 36);
+        let mut terminal = Terminal::new(backend).expect("crear terminal de prueba");
+        let app = App::default();
+        terminal
+            .draw(|f| render(f, &app))
+            .expect("renderizar en pantalla grande");
     }
 }
