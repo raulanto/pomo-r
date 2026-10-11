@@ -11,6 +11,7 @@ pub struct App {
     pub should_quit: bool,
     pub message: Option<(String, Instant)>,
     pub auto_start_next: bool,
+    pub desktop_notifications: bool,
     pub redraw_requested: bool,
 }
 
@@ -35,6 +36,7 @@ impl App {
             should_quit: false,
             message: None,
             auto_start_next: config.auto_start_next,
+            desktop_notifications: config.desktop_notifications,
             redraw_requested: false,
         }
     }
@@ -83,6 +85,19 @@ impl App {
 
         let finished = self.timer.tick(now);
         if let Some(finished_event) = finished {
+            crate::notify::notify_phase_change(
+                &finished_event,
+                self.bell,
+                self.desktop_notifications,
+            );
+
+            let msg = format!(
+                "¡{} terminada! Siguiente: {}",
+                finished_event.finished_phase.label(),
+                finished_event.next_phase.label()
+            );
+            self.set_message(msg);
+
             if self.auto_start_next {
                 self.timer.start();
             }
@@ -189,5 +204,26 @@ mod tests {
         // At or after 3 seconds: message is cleared
         app.on_tick(t0 + Duration::from_secs(3));
         assert!(app.message.is_none());
+    }
+
+    #[test]
+    fn test_on_tick_finishes_phase_auto_start_next() {
+        let mut app = App {
+            auto_start_next: true,
+            ..App::default()
+        };
+        app.handle(Action::ToggleTimer);
+
+        let t0 = Instant::now();
+        app.on_tick(t0);
+
+        let t1 = t0 + app.timer.remaining();
+        let event = app.on_tick(t1);
+
+        assert!(event.is_some());
+        assert_eq!(app.timer.phase(), Phase::ShortBreak);
+        // Because auto_start_next is true, status should be Running!
+        assert_eq!(app.timer.status(), Status::Running);
+        assert!(app.message.is_some());
     }
 }

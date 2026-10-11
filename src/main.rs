@@ -9,7 +9,6 @@ mod cli;
 mod config;
 mod domain;
 mod input;
-#[allow(dead_code)]
 mod notify;
 mod terminal;
 mod ui;
