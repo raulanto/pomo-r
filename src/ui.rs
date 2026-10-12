@@ -234,17 +234,21 @@ fn render_status(frame: &mut Frame, app: &App, area: Rect, color: Color) {
     let halves =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(inner);
 
+    let mut status_spans = vec![
+        Span::styled(
+            format!(" {} ", sym),
+            Style::default()
+                .fg(status_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(label, Style::default().fg(status_color)),
+    ];
+    if !app.sound {
+        status_spans.push(Span::styled(" · 🔇", Style::default().fg(Color::DarkGray)));
+    }
+
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!(" {} ", sym),
-                Style::default()
-                    .fg(status_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(label, Style::default().fg(status_color)),
-        ]))
-        .alignment(Alignment::Center),
+        Paragraph::new(Line::from(status_spans)).alignment(Alignment::Center),
         halves[0],
     );
 
@@ -314,7 +318,7 @@ fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
 
 fn render_help_popup(frame: &mut Frame, area: Rect) {
     let popup_width = 62u16.min(area.width);
-    let popup_height = 16u16.min(area.height);
+    let popup_height = 17u16.min(area.height);
     let popup_area = centered_rect(popup_width, popup_height, area);
 
     let rows = vec![
@@ -327,6 +331,7 @@ fn render_help_popup(frame: &mut Frame, area: Rect) {
         Row::new(vec!["-  /  ↓", "-1 minuto"]),
         Row::new(vec!["1 / 2 / 3", "Trabajo / Descanso corto / Largo"]),
         Row::new(vec!["b", "Activar/desactivar campana"]),
+        Row::new(vec!["m", "Activar/desactivar sonido ambiental"]),
         Row::new(vec!["? / h / F1", "Mostrar/ocultar ayuda"]),
         Row::new(vec!["Ctrl+L", "Redibujar pantalla"]),
     ];

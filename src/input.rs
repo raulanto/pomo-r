@@ -15,6 +15,7 @@ pub enum Action {
     SelectPhase(Phase),
     Redraw,
     ToggleBell,
+    ToggleSound,
 }
 
 pub fn map_key(key: KeyEvent) -> Option<Action> {
@@ -53,6 +54,7 @@ pub fn map_key(key: KeyEvent) -> Option<Action> {
 
         // Utilidades y ayuda
         (KeyCode::Char('b'), m) if m.is_empty() => Some(Action::ToggleBell),
+        (KeyCode::Char('m'), m) if m.is_empty() => Some(Action::ToggleSound),
         (KeyCode::Char('?'), _) | (KeyCode::Char('h'), _) | (KeyCode::F(1), _) => {
             Some(Action::ToggleHelp)
         }
@@ -168,6 +170,10 @@ mod tests {
         assert_eq!(
             map_key(press(KeyCode::Char('b'), KeyModifiers::NONE)),
             Some(Action::ToggleBell)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char('m'), KeyModifiers::NONE)),
+            Some(Action::ToggleSound)
         );
         assert_eq!(
             map_key(press(KeyCode::Char('?'), KeyModifiers::NONE)),

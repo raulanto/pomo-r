@@ -28,7 +28,7 @@ Separación simple al estilo hexagonal: el dominio no conoce la terminal.
 | Dominio | `src/domain/{phase,timer}.rs` | Lógica pura. Sin `crossterm`, `ratatui`, `std::io` ni `Instant::now()`; el tiempo entra por parámetro. 100 % testeable. |
 | Aplicación | `src/app.rs`, `src/input.rs` | `App` guarda estado y aplica `Action`. `input` solo traduce `KeyEvent → Action`. |
 | Presentación | `src/ui.rs` | Solo dibuja desde `&App`. No muta estado. |
-| Infraestructura | `src/terminal.rs`, `src/config.rs`, `src/notify.rs`, `src/cli.rs` | I/O: terminal, archivos, señales, notificaciones. |
+| Infraestructura | `src/terminal.rs`, `src/config.rs`, `src/notify.rs`, `src/audio.rs`, `src/cli.rs` | I/O: terminal, archivos, señales, notificaciones, audio. |
 | Entrada | `src/main.rs` | Ensambla todo y corre el bucle. Sin lógica de negocio. |
 
 Flujo por iteración: `draw` → `event::poll(200ms)` → `map_key` → `app.handle(action)` → `app.on_tick(Instant::now())`.
@@ -51,7 +51,7 @@ Flujo por iteración: `draw` → `event::poll(200ms)` → `map_key` → `app.han
 9. Sin `unwrap()`/`expect()` fuera de tests; usar `anyhow::Result` en infraestructura y `Option`/`Result` tipados en dominio.
 10. Nada de `println!` mientras la TUI está activa (rompe el render). Mensajes al usuario van por `App.message` o a `stderr` tras `restore()`.
 11. Los atajos se definen **solo** en `input.rs`. Si se agrega uno, actualizar también la ayuda en `ui.rs` y la tabla del `README.md`.
-12. Los errores de notificaciones/campana se ignoran; nunca deben cerrar la app.
+12. Los errores de notificaciones/campana/sonido se ignoran; nunca deben cerrar la app.
 13. Configuración: valores por defecto razonables si falta el archivo; los flags de CLI tienen prioridad sobre el TOML. Duraciones mínimas de 1 minuto.
 
 ## Cómo agregar cosas
@@ -86,9 +86,9 @@ La UI se verifica manualmente (`cargo run`) y, si se desea, con `ratatui::backen
 - [ ] `kill -TERM <pid>` sale limpio.
 - [ ] Redimensionar la ventana no rompe la UI; en tamaño muy pequeño no hay panic.
 - [ ] Pausar 10 s y reanudar no descuenta ese tiempo.
-- [ ] Al terminar una fase suena la campana y cambia a la siguiente.
+- [ ] Al terminar una fase suena la campana / sonido envolvente y cambia a la siguiente.
 - [ ] `?` abre/cierra la ayuda y lista todos los atajos reales.
 
 ## Fuera de alcance (por ahora)
 
-Estadísticas persistentes, sonido, sincronización en red, tareas por pomodoro. Si se añaden, respetar la separación de capas y documentarlas aquí.
+Estadísticas persistentes, sincronización en red, tareas por pomodoro. Si se añaden, respetar la separación de capas y documentarlas aquí.

@@ -5,6 +5,7 @@ use clap::Parser;
 use crossterm::event::{self, Event};
 
 mod app;
+mod audio;
 mod cli;
 mod config;
 mod domain;

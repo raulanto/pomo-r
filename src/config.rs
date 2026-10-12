@@ -13,6 +13,7 @@ pub struct Config {
     pub long_break_every: u32,
     pub auto_start_next: bool,
     pub bell: bool,
+    pub sound: bool,
     pub desktop_notifications: bool,
 }
 
@@ -25,6 +26,7 @@ impl Default for Config {
             long_break_every: 4,
             auto_start_next: false,
             bell: true,
+            sound: true,
             desktop_notifications: false,
         }
     }
@@ -81,6 +83,9 @@ impl Config {
         if cli.no_bell {
             self.bell = false;
         }
+        if cli.no_sound {
+            self.sound = false;
+        }
 
         self.sanitize();
         self
@@ -100,6 +105,7 @@ mod tests {
         assert_eq!(config.long_break_every, 4);
         assert!(!config.auto_start_next);
         assert!(config.bell);
+        assert!(config.sound);
         assert!(!config.desktop_notifications);
     }
 
@@ -113,6 +119,7 @@ mod tests {
             cycles: Some(2),
             auto_start: true,
             no_bell: true,
+            no_sound: true,
         };
 
         let merged = config.merge(cli);
@@ -122,6 +129,7 @@ mod tests {
         assert_eq!(merged.long_break_every, 2);
         assert!(merged.auto_start_next);
         assert!(!merged.bell);
+        assert!(!merged.sound);
     }
 
     #[test]
@@ -134,6 +142,7 @@ mod tests {
             cycles: Some(0),
             auto_start: false,
             no_bell: false,
+            no_sound: false,
         };
 
         let merged = config.merge(cli);
@@ -155,6 +164,7 @@ mod tests {
         let toml_str = r#"
             work_minutes = 45
             bell = false
+            sound = false
         "#;
         let mut config: Config = toml::from_str(toml_str).unwrap();
         config.sanitize();
@@ -164,6 +174,7 @@ mod tests {
         assert_eq!(config.long_break_minutes, 15); // default
         assert_eq!(config.long_break_every, 4); // default
         assert!(!config.bell);
+        assert!(!config.sound);
         assert!(!config.auto_start_next);
     }
 }

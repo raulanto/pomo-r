@@ -17,6 +17,7 @@ directories = "5"
 anyhow = "1"
 signal-hook = "0.3"
 notify-rust = { version = "4", optional = true }
+rodio = "0.20"
 
 [features]
 notify = ["dep:notify-rust"]

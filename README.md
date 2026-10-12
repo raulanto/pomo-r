@@ -22,6 +22,7 @@ Aplicación TUI (interfaz de terminal) para trabajar con la técnica Pomodoro. S
 | `directories` | Ruta estándar del archivo de configuración por sistema operativo |
 | `anyhow` | Manejo de errores simple en `main` y en infraestructura |
 | `signal-hook` | Capturar `SIGTERM`/`SIGHUP` (Unix) y salir limpio |
+| `rodio` | Sonido ambiental procedural envolvente (cuenco zen y carillón cristalino) |
 | `notify-rust` (opcional) | Notificaciones de escritorio |
 
 ```toml
@@ -40,6 +41,7 @@ toml = "0.8"
 directories = "5"
 anyhow = "1"
 signal-hook = "0.3"
+rodio = "0.20"
 notify-rust = { version = "4", optional = true }
 
 [features]
@@ -67,7 +69,8 @@ pomo/
     ├── input.rs         # Traduce KeyEvent → Action (mapa de atajos)
     ├── ui.rs            # Render con ratatui (layout, gauge, ayuda)
     ├── terminal.rs      # Init/restore de terminal + panic hook + señales
-    └── notify.rs        # Campana y notificación de escritorio
+    ├── notify.rs        # Campana y notificación de escritorio
+    └── audio.rs         # Síntesis procedural de audio ambiental envolvente
 ```
 
 ## Cómo se construye cada parte
@@ -102,6 +105,7 @@ long_break_minutes = 15
 long_break_every = 4
 auto_start_next = false
 bell = true
+sound = true
 desktop_notifications = false
 ```
 - Ruta con `directories::ProjectDirs`.
@@ -117,6 +121,7 @@ pomo [OPTIONS]
   -c, --cycles <N>          Pomodoros antes del descanso largo
       --auto-start          Iniciar la siguiente fase sola
       --no-bell             Sin campana
+      --no-sound            Sin sonido ambiental
   -h, --help / -V, --version
 ```
 
@@ -133,7 +138,7 @@ Es la parte clave para que se comporte como un programa de terminal normal.
 ### 6. `input.rs` — Atajos de teclado
 Función `map_key(KeyEvent) -> Option<Action>`. Filtrar `key.kind == KeyEventKind::Press` (en Windows llegan también `Release`/`Repeat`).
 
-`Action`: `Quit`, `ToggleTimer`, `Reset`, `Skip`, `Increase`, `Decrease`, `ToggleHelp`, `SelectPhase(Phase)`, `Redraw`, `ToggleBell`.
+`Action`: `Quit`, `ToggleTimer`, `Reset`, `Skip`, `Increase`, `Decrease`, `ToggleHelp`, `SelectPhase(Phase)`, `Redraw`, `ToggleBell`, `ToggleSound`.
 
 | Atajo | Acción |
 |---|---|
@@ -147,6 +152,7 @@ Función `map_key(KeyEvent) -> Option<Action>`. Filtrar `key.kind == KeyEventKin
 | `-` / `↓` | −1 minuto a la fase actual |
 | `1` / `2` / `3` | Ir a Trabajo / Descanso corto / Descanso largo |
 | `b` | Activar/desactivar campana |
+| `m` | Activar/desactivar sonido ambiental |
 | `?` / `h` / `F1` | Mostrar/ocultar ayuda |
 | `Ctrl+L` | Redibujar pantalla |
 
@@ -254,5 +260,4 @@ cargo install --path .              # instalar como comando `pomo`
 
 - Estadísticas diarias guardadas en archivo (pomodoros por día).
 - Etiquetas/tareas por pomodoro.
-- Sonido con `rodio`.
-- Temas de color.
+- Temas de color personalizados por archivo.

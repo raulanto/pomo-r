@@ -30,6 +30,10 @@ pub struct Cli {
     /// Sin campana
     #[arg(long = "no-bell")]
     pub no_bell: bool,
+
+    /// Sin sonido ambiental
+    #[arg(long = "no-sound")]
+    pub no_sound: bool,
 }
 
 #[cfg(test)]
@@ -46,6 +50,7 @@ mod tests {
         assert_eq!(cli.cycles, None);
         assert!(!cli.auto_start);
         assert!(!cli.no_bell);
+        assert!(!cli.no_sound);
     }
 
     #[test]
@@ -62,6 +67,7 @@ mod tests {
             "3",
             "--auto-start",
             "--no-bell",
+            "--no-sound",
         ];
         let cli = Cli::parse_from(args);
         assert_eq!(cli.work, Some(50));
@@ -70,5 +76,6 @@ mod tests {
         assert_eq!(cli.cycles, Some(3));
         assert!(cli.auto_start);
         assert!(cli.no_bell);
+        assert!(cli.no_sound);
     }
 }

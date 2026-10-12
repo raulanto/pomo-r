@@ -8,6 +8,7 @@ pub struct App {
     pub timer: Timer,
     pub show_help: bool,
     pub bell: bool,
+    pub sound: bool,
     pub should_quit: bool,
     pub message: Option<(String, Instant)>,
     pub auto_start_next: bool,
@@ -33,6 +34,7 @@ impl App {
             timer,
             show_help: false,
             bell: config.bell,
+            sound: config.sound,
             should_quit: false,
             message: None,
             auto_start_next: config.auto_start_next,
@@ -73,6 +75,15 @@ impl App {
                 let status = if self.bell { "activada" } else { "desactivada" };
                 self.set_message(format!("Campana {}", status));
             }
+            Action::ToggleSound => {
+                self.sound = !self.sound;
+                let status = if self.sound {
+                    "activado"
+                } else {
+                    "desactivado"
+                };
+                self.set_message(format!("Sonido {}", status));
+            }
         }
     }
 
@@ -88,6 +99,7 @@ impl App {
             crate::notify::notify_phase_change(
                 &finished_event,
                 self.bell,
+                self.sound,
                 self.desktop_notifications,
             );
 
@@ -188,6 +200,19 @@ mod tests {
 
         app.handle(Action::ToggleBell);
         assert!(app.bell);
+    }
+
+    #[test]
+    fn test_handle_toggle_sound() {
+        let mut app = App::default();
+        assert!(app.sound);
+
+        app.handle(Action::ToggleSound);
+        assert!(!app.sound);
+        assert!(app.message.is_some());
+
+        app.handle(Action::ToggleSound);
+        assert!(app.sound);
     }
 
     #[test]
