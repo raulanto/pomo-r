@@ -34,6 +34,10 @@ pub struct Cli {
     /// Sin sonido ambiental
     #[arg(long = "no-sound")]
     pub no_sound: bool,
+
+    /// Volumen del sonido (0-100)
+    #[arg(short = 'v', long = "volume", value_name = "0-100")]
+    pub volume: Option<u8>,
 }
 
 #[cfg(test)]
@@ -51,6 +55,7 @@ mod tests {
         assert!(!cli.auto_start);
         assert!(!cli.no_bell);
         assert!(!cli.no_sound);
+        assert_eq!(cli.volume, None);
     }
 
     #[test]
@@ -68,6 +73,8 @@ mod tests {
             "--auto-start",
             "--no-bell",
             "--no-sound",
+            "-v",
+            "65",
         ];
         let cli = Cli::parse_from(args);
         assert_eq!(cli.work, Some(50));
@@ -77,5 +84,6 @@ mod tests {
         assert!(cli.auto_start);
         assert!(cli.no_bell);
         assert!(cli.no_sound);
+        assert_eq!(cli.volume, Some(65));
     }
 }

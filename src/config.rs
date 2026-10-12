@@ -14,6 +14,7 @@ pub struct Config {
     pub auto_start_next: bool,
     pub bell: bool,
     pub sound: bool,
+    pub volume: u8,
     pub desktop_notifications: bool,
 }
 
@@ -27,6 +28,7 @@ impl Default for Config {
             auto_start_next: false,
             bell: true,
             sound: true,
+            volume: 80,
             desktop_notifications: false,
         }
     }
@@ -62,6 +64,7 @@ impl Config {
         self.short_break_minutes = self.short_break_minutes.max(1);
         self.long_break_minutes = self.long_break_minutes.max(1);
         self.long_break_every = self.long_break_every.max(1);
+        self.volume = self.volume.min(100);
     }
 
     pub fn merge(mut self, cli: Cli) -> Self {
@@ -86,6 +89,9 @@ impl Config {
         if cli.no_sound {
             self.sound = false;
         }
+        if let Some(vol) = cli.volume {
+            self.volume = vol.min(100);
+        }
 
         self.sanitize();
         self
@@ -106,6 +112,7 @@ mod tests {
         assert!(!config.auto_start_next);
         assert!(config.bell);
         assert!(config.sound);
+        assert_eq!(config.volume, 80);
         assert!(!config.desktop_notifications);
     }
 
@@ -120,6 +127,7 @@ mod tests {
             auto_start: true,
             no_bell: true,
             no_sound: true,
+            volume: Some(60),
         };
 
         let merged = config.merge(cli);
@@ -130,10 +138,11 @@ mod tests {
         assert!(merged.auto_start_next);
         assert!(!merged.bell);
         assert!(!merged.sound);
+        assert_eq!(merged.volume, 60);
     }
 
     #[test]
-    fn test_merge_enforces_minimum() {
+    fn test_merge_enforces_minimum_and_caps_volume() {
         let config = Config::default();
         let cli = Cli {
             work: Some(0),
@@ -143,6 +152,7 @@ mod tests {
             auto_start: false,
             no_bell: false,
             no_sound: false,
+            volume: Some(150),
         };
 
         let merged = config.merge(cli);
@@ -150,6 +160,7 @@ mod tests {
         assert_eq!(merged.short_break_minutes, 1);
         assert_eq!(merged.long_break_minutes, 1);
         assert_eq!(merged.long_break_every, 1);
+        assert_eq!(merged.volume, 100);
     }
 
     #[test]
@@ -165,6 +176,7 @@ mod tests {
             work_minutes = 45
             bell = false
             sound = false
+            volume = 40
         "#;
         let mut config: Config = toml::from_str(toml_str).unwrap();
         config.sanitize();
@@ -175,6 +187,7 @@ mod tests {
         assert_eq!(config.long_break_every, 4); // default
         assert!(!config.bell);
         assert!(!config.sound);
+        assert_eq!(config.volume, 40);
         assert!(!config.auto_start_next);
     }
 }

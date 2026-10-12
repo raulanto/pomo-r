@@ -8,13 +8,19 @@ pub fn ring_bell() {
     let _ = stdout.flush();
 }
 
-pub fn notify_phase_change(event: &PhaseFinished, bell: bool, sound: bool, desktop: bool) {
+pub fn notify_phase_change(
+    event: &PhaseFinished,
+    bell: bool,
+    sound: bool,
+    volume: u8,
+    desktop: bool,
+) {
     if bell {
         ring_bell();
     }
 
     if sound {
-        crate::audio::play_phase_sound_async(event.next_phase);
+        crate::audio::play_phase_sound_async(event.next_phase, volume);
     }
 
     if desktop {
@@ -61,9 +67,9 @@ mod tests {
             next_phase: Phase::ShortBreak,
             completed_pomodoros: 1,
         };
-        notify_phase_change(&event, false, false, false);
-        notify_phase_change(&event, true, false, false);
-        notify_phase_change(&event, false, true, false);
+        notify_phase_change(&event, false, false, 80, false);
+        notify_phase_change(&event, true, false, 80, false);
+        notify_phase_change(&event, false, true, 80, false);
     }
 
     #[test]

@@ -149,15 +149,19 @@ fn generate_crystal_chime() -> Vec<f32> {
 
 /// Reproduce el sonido de cambio de fase de manera asíncrona en un hilo independiente.
 /// Nunca bloquea el bucle de eventos ni hace panic si no hay dispositivo de audio.
-pub fn play_phase_sound_async(next_phase: Phase) {
+pub fn play_phase_sound_async(next_phase: Phase, volume: u8) {
     std::thread::spawn(move || {
-        play_phase_sound(next_phase);
+        play_phase_sound(next_phase, volume);
     });
 }
 
 /// Reproduce el sonido correspondiente usando `rodio`.
 /// Si el hardware de audio no está disponible o falla, simplemente no hace nada (no panic).
-pub fn play_phase_sound(next_phase: Phase) {
+pub fn play_phase_sound(next_phase: Phase, volume: u8) {
+    if volume == 0 {
+        return;
+    }
+
     let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() else {
         return;
     };
@@ -165,6 +169,9 @@ pub fn play_phase_sound(next_phase: Phase) {
     let Ok(sink) = rodio::Sink::try_new(&stream_handle) else {
         return;
     };
+
+    let volume_ratio = (volume as f32 / 100.0).clamp(0.0, 1.0);
+    sink.set_volume(volume_ratio);
 
     let samples = generate_sound(next_phase);
     let source = rodio::buffer::SamplesBuffer::new(2, SAMPLE_RATE, samples);
@@ -196,7 +203,8 @@ mod tests {
     #[test]
     fn test_play_phase_sound_no_panic() {
         // En CI o máquinas sin audio, no debe hacer panic
-        play_phase_sound(Phase::ShortBreak);
-        play_phase_sound(Phase::Work);
+        play_phase_sound(Phase::ShortBreak, 80);
+        play_phase_sound(Phase::Work, 0);
+        play_phase_sound(Phase::Work, 100);
     }
 }

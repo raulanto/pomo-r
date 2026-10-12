@@ -16,6 +16,10 @@ pub enum Action {
     Redraw,
     ToggleBell,
     ToggleSound,
+    ToggleSoundSettings,
+    VolumeUp,
+    VolumeDown,
+    TestSound,
 }
 
 pub fn map_key(key: KeyEvent) -> Option<Action> {
@@ -52,9 +56,15 @@ pub fn map_key(key: KeyEvent) -> Option<Action> {
         (KeyCode::Char('2'), _) => Some(Action::SelectPhase(Phase::ShortBreak)),
         (KeyCode::Char('3'), _) => Some(Action::SelectPhase(Phase::LongBreak)),
 
-        // Utilidades y ayuda
+        // Utilidades, sonido y ayuda
         (KeyCode::Char('b'), m) if m.is_empty() => Some(Action::ToggleBell),
         (KeyCode::Char('m'), m) if m.is_empty() => Some(Action::ToggleSound),
+        (KeyCode::Char('v'), m) if m.is_empty() => Some(Action::ToggleSoundSettings),
+        (KeyCode::Char('V'), m) if m.is_empty() => Some(Action::ToggleSoundSettings),
+        (KeyCode::Char(']'), _) => Some(Action::VolumeUp),
+        (KeyCode::Char('['), _) => Some(Action::VolumeDown),
+        (KeyCode::Char('p'), m) if m.is_empty() => Some(Action::TestSound),
+        (KeyCode::Char('P'), m) if m.is_empty() => Some(Action::TestSound),
         (KeyCode::Char('?'), _) | (KeyCode::Char('h'), _) | (KeyCode::F(1), _) => {
             Some(Action::ToggleHelp)
         }
@@ -174,6 +184,26 @@ mod tests {
         assert_eq!(
             map_key(press(KeyCode::Char('m'), KeyModifiers::NONE)),
             Some(Action::ToggleSound)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char('v'), KeyModifiers::NONE)),
+            Some(Action::ToggleSoundSettings)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char('V'), KeyModifiers::NONE)),
+            Some(Action::ToggleSoundSettings)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char(']'), KeyModifiers::NONE)),
+            Some(Action::VolumeUp)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char('['), KeyModifiers::NONE)),
+            Some(Action::VolumeDown)
+        );
+        assert_eq!(
+            map_key(press(KeyCode::Char('p'), KeyModifiers::NONE)),
+            Some(Action::TestSound)
         );
         assert_eq!(
             map_key(press(KeyCode::Char('?'), KeyModifiers::NONE)),

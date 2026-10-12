@@ -7,8 +7,10 @@ use crate::input::Action;
 pub struct App {
     pub timer: Timer,
     pub show_help: bool,
+    pub show_sound_settings: bool,
     pub bell: bool,
     pub sound: bool,
+    pub volume: u8,
     pub should_quit: bool,
     pub message: Option<(String, Instant)>,
     pub auto_start_next: bool,
@@ -33,8 +35,10 @@ impl App {
         Self {
             timer,
             show_help: false,
+            show_sound_settings: false,
             bell: config.bell,
             sound: config.sound,
+            volume: config.volume,
             should_quit: false,
             message: None,
             auto_start_next: config.auto_start_next,
@@ -58,16 +62,71 @@ impl App {
             Action::CloseHelpOrQuit => {
                 if self.show_help {
                     self.show_help = false;
+                } else if self.show_sound_settings {
+                    self.show_sound_settings = false;
                 } else {
                     self.should_quit = true;
                 }
             }
-            Action::ToggleTimer => self.timer.toggle(),
+            Action::ToggleHelp => {
+                self.show_help = !self.show_help;
+                if self.show_help {
+                    self.show_sound_settings = false;
+                }
+            }
+            Action::ToggleSoundSettings => {
+                self.show_sound_settings = !self.show_sound_settings;
+                if self.show_sound_settings {
+                    self.show_help = false;
+                }
+            }
+            Action::ToggleTimer => {
+                if self.show_sound_settings {
+                    self.sound = !self.sound;
+                    let status = if self.sound {
+                        "activado"
+                    } else {
+                        "desactivado"
+                    };
+                    self.set_message(format!("Sonido {}", status));
+                } else {
+                    self.timer.toggle();
+                }
+            }
             Action::Reset => self.timer.reset(),
             Action::Skip => self.timer.skip(),
-            Action::Increase => self.timer.adjust(1),
-            Action::Decrease => self.timer.adjust(-1),
-            Action::ToggleHelp => self.show_help = !self.show_help,
+            Action::Increase => {
+                if self.show_sound_settings {
+                    self.volume = (self.volume.saturating_add(5)).min(100);
+                    self.set_message(format!("Volumen: {}%", self.volume));
+                } else {
+                    self.timer.adjust(1);
+                }
+            }
+            Action::Decrease => {
+                if self.show_sound_settings {
+                    self.volume = self.volume.saturating_sub(5);
+                    self.set_message(format!("Volumen: {}%", self.volume));
+                } else {
+                    self.timer.adjust(-1);
+                }
+            }
+            Action::VolumeUp => {
+                self.volume = (self.volume.saturating_add(5)).min(100);
+                self.set_message(format!("Volumen: {}%", self.volume));
+            }
+            Action::VolumeDown => {
+                self.volume = self.volume.saturating_sub(5);
+                self.set_message(format!("Volumen: {}%", self.volume));
+            }
+            Action::TestSound => {
+                if self.sound {
+                    crate::audio::play_phase_sound_async(self.timer.phase(), self.volume);
+                    self.set_message(format!("Sonido de prueba ({}%)", self.volume));
+                } else {
+                    self.set_message("Sonido desactivado (presiona 'm' o 'Space' para activarlo)");
+                }
+            }
             Action::SelectPhase(phase) => self.timer.select_phase(phase),
             Action::Redraw => self.redraw_requested = true,
             Action::ToggleBell => {
@@ -100,6 +159,7 @@ impl App {
                 &finished_event,
                 self.bell,
                 self.sound,
+                self.volume,
                 self.desktop_notifications,
             );
 
@@ -145,9 +205,90 @@ mod tests {
         assert!(!app.show_help);
         assert!(!app.should_quit);
 
-        // When help is closed, Esc quits
+        // When sound settings is open, Esc closes sound settings
+        app.show_sound_settings = true;
+        app.handle(Action::CloseHelpOrQuit);
+        assert!(!app.show_sound_settings);
+        assert!(!app.should_quit);
+
+        // When all are closed, Esc quits
         app.handle(Action::CloseHelpOrQuit);
         assert!(app.should_quit);
+    }
+
+    #[test]
+    fn test_handle_toggle_sound_settings() {
+        let mut app = App::default();
+        assert!(!app.show_sound_settings);
+
+        app.handle(Action::ToggleSoundSettings);
+        assert!(app.show_sound_settings);
+        assert!(!app.show_help);
+
+        app.handle(Action::ToggleHelp);
+        assert!(app.show_help);
+        assert!(!app.show_sound_settings);
+
+        app.handle(Action::ToggleSoundSettings);
+        assert!(app.show_sound_settings);
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn test_handle_volume_up_down() {
+        let mut app = App::default();
+        app.volume = 80;
+
+        app.handle(Action::VolumeUp);
+        assert_eq!(app.volume, 85);
+
+        app.handle(Action::VolumeDown);
+        assert_eq!(app.volume, 80);
+
+        // Cap at 100
+        app.volume = 98;
+        app.handle(Action::VolumeUp);
+        assert_eq!(app.volume, 100);
+
+        // Bottom at 0
+        app.volume = 2;
+        app.handle(Action::VolumeDown);
+        assert_eq!(app.volume, 0);
+    }
+
+    #[test]
+    fn test_sound_settings_modal_shortcuts() {
+        let mut app = App {
+            show_sound_settings: true,
+            volume: 50,
+            sound: true,
+            ..App::default()
+        };
+
+        // In modal, Increase/Decrease adjusts volume instead of timer
+        app.handle(Action::Increase);
+        assert_eq!(app.volume, 55);
+
+        app.handle(Action::Decrease);
+        assert_eq!(app.volume, 50);
+
+        // In modal, ToggleTimer (Space/Enter) toggles sound on/off
+        app.handle(Action::ToggleTimer);
+        assert!(!app.sound);
+
+        app.handle(Action::ToggleTimer);
+        assert!(app.sound);
+    }
+
+    #[test]
+    fn test_handle_test_sound() {
+        let mut app = App::default();
+        app.handle(Action::TestSound);
+        assert!(app.message.is_some());
+
+        app.sound = false;
+        app.handle(Action::TestSound);
+        assert!(app.message.is_some());
     }
 
     #[test]

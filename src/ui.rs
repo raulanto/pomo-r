@@ -54,6 +54,8 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     if app.show_help {
         render_help_popup(frame, area);
+    } else if app.show_sound_settings {
+        render_sound_popup(frame, app, area);
     }
 }
 
@@ -284,8 +286,8 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(" reiniciar  ", Style::default().fg(Color::DarkGray)),
             key_hint("n"),
             Span::styled(" saltar  ", Style::default().fg(Color::DarkGray)),
-            key_hint("+/-"),
-            Span::styled(" ajustar  ", Style::default().fg(Color::DarkGray)),
+            key_hint("v"),
+            Span::styled(" sonido  ", Style::default().fg(Color::DarkGray)),
             key_hint("?"),
             Span::styled(" ayuda  ", Style::default().fg(Color::DarkGray)),
             key_hint("q"),
@@ -318,7 +320,7 @@ fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
 
 fn render_help_popup(frame: &mut Frame, area: Rect) {
     let popup_width = 62u16.min(area.width);
-    let popup_height = 17u16.min(area.height);
+    let popup_height = 20u16.min(area.height);
     let popup_area = centered_rect(popup_width, popup_height, area);
 
     let rows = vec![
@@ -331,7 +333,10 @@ fn render_help_popup(frame: &mut Frame, area: Rect) {
         Row::new(vec!["-  /  ↓", "-1 minuto"]),
         Row::new(vec!["1 / 2 / 3", "Trabajo / Descanso corto / Largo"]),
         Row::new(vec!["b", "Activar/desactivar campana"]),
-        Row::new(vec!["m", "Activar/desactivar sonido ambiental"]),
+        Row::new(vec!["v", "Configuración de sonido / volumen"]),
+        Row::new(vec!["m", "Activar/silenciar sonido ambiental"]),
+        Row::new(vec!["]  /  [", "Subir / bajar volumen (±5%)"]),
+        Row::new(vec!["p", "Probar sonido ambiental"]),
         Row::new(vec!["? / h / F1", "Mostrar/ocultar ayuda"]),
         Row::new(vec!["Ctrl+L", "Redibujar pantalla"]),
     ];
@@ -358,6 +363,102 @@ fn render_help_popup(frame: &mut Frame, area: Rect) {
 
     frame.render_widget(Clear, popup_area);
     frame.render_widget(table, popup_area);
+}
+
+fn render_sound_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let popup_width = 54u16.min(area.width);
+    let popup_height = 14u16.min(area.height);
+    let popup_area = centered_rect(popup_width, popup_height, area);
+
+    let filled_slots = ((app.volume as usize) * 16) / 100;
+    let empty_slots = 16 - filled_slots;
+    let bar_fill = "█".repeat(filled_slots);
+    let bar_empty = "░".repeat(empty_slots);
+
+    let (status_text, status_color) = if app.sound {
+        (" ACTIVADO ● ", Color::Green)
+    } else {
+        (" DESACTIVADO ○ ", Color::DarkGray)
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("   Estado:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("[{}]", status_text),
+                Style::default()
+                    .fg(status_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("   Volumen:   ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                bar_fill,
+                Style::default().fg(if app.sound {
+                    Color::Cyan
+                } else {
+                    Color::DarkGray
+                }),
+            ),
+            Span::styled(bar_empty, Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("] {:>3}%", app.volume),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "   ──────────────────────────────────────────",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(vec![
+            Span::raw("   "),
+            key_hint("Space/m"),
+            Span::styled(" Activar / Silenciar", Style::default().fg(Color::DarkGray)),
+        ]),
+        Line::from(vec![
+            Span::raw("   "),
+            key_hint("+/-  ]"),
+            Span::styled(
+                " Subir / Bajar volumen (±5%)",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(vec![
+            Span::raw("   "),
+            key_hint("p"),
+            Span::styled(
+                "       Probar sonido actual",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(vec![
+            Span::raw("   "),
+            key_hint("Esc/v"),
+            Span::styled(
+                "   Cerrar apartado",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+    ];
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(Span::styled(
+            " 🔊 Configuración de Sonido ",
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ));
+
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(Paragraph::new(lines).block(block), popup_area);
 }
 
 #[cfg(test)]
@@ -399,6 +500,12 @@ mod tests {
         terminal
             .draw(|f| render(f, &app))
             .expect("renderizar ayuda");
+
+        app.show_help = false;
+        app.show_sound_settings = true;
+        terminal
+            .draw(|f| render(f, &app))
+            .expect("renderizar configuración de sonido");
 
         app.set_message("Test alerta");
         terminal
