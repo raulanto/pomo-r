@@ -236,8 +236,10 @@ mod tests {
 
     #[test]
     fn test_handle_volume_up_down() {
-        let mut app = App::default();
-        app.volume = 80;
+        let mut app = App {
+            volume: 80,
+            ..App::default()
+        };
 
         app.handle(Action::VolumeUp);
         assert_eq!(app.volume, 85);

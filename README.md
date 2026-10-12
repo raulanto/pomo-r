@@ -106,6 +106,7 @@ long_break_every = 4
 auto_start_next = false
 bell = true
 sound = true
+volume = 80
 desktop_notifications = false
 ```
 - Ruta con `directories::ProjectDirs`.
@@ -122,6 +123,7 @@ pomo [OPTIONS]
       --auto-start          Iniciar la siguiente fase sola
       --no-bell             Sin campana
       --no-sound            Sin sonido ambiental
+  -v, --volume <0-100>      Volumen del sonido ambiental (0 a 100)
   -h, --help / -V, --version
 ```
 
@@ -138,21 +140,24 @@ Es la parte clave para que se comporte como un programa de terminal normal.
 ### 6. `input.rs` — Atajos de teclado
 Función `map_key(KeyEvent) -> Option<Action>`. Filtrar `key.kind == KeyEventKind::Press` (en Windows llegan también `Release`/`Repeat`).
 
-`Action`: `Quit`, `ToggleTimer`, `Reset`, `Skip`, `Increase`, `Decrease`, `ToggleHelp`, `SelectPhase(Phase)`, `Redraw`, `ToggleBell`, `ToggleSound`.
+`Action`: `Quit`, `ToggleTimer`, `Reset`, `Skip`, `Increase`, `Decrease`, `ToggleHelp`, `SelectPhase(Phase)`, `Redraw`, `ToggleBell`, `ToggleSound`, `ToggleSoundSettings`, `VolumeUp`, `VolumeDown`, `TestSound`.
 
 | Atajo | Acción |
 |---|---|
 | `Ctrl+C` | Salir |
 | `Ctrl+D` | Salir |
-| `q` / `Esc` | Salir (Esc cierra primero la ayuda si está abierta) |
+| `q` / `Esc` | Salir (Esc cierra primero la ayuda o configuración si está abierta) |
 | `Space` / `Enter` | Iniciar / pausar |
 | `r` / `Ctrl+R` | Reiniciar fase actual |
 | `n` / `s` / `→` | Saltar a la siguiente fase |
-| `+` / `↑` | +1 minuto a la fase actual |
-| `-` / `↓` | −1 minuto a la fase actual |
+| `+` / `↑` | +1 minuto a la fase actual (o +5% volumen en menú de sonido) |
+| `-` / `↓` | −1 minuto a la fase actual (o -5% volumen en menú de sonido) |
 | `1` / `2` / `3` | Ir a Trabajo / Descanso corto / Descanso largo |
 | `b` | Activar/desactivar campana |
+| `v` | Abrir/cerrar configuración de sonido y volumen |
 | `m` | Activar/desactivar sonido ambiental |
+| `]` / `[` | Subir / bajar volumen (±5%) |
+| `p` | Probar sonido ambiental actual |
 | `?` / `h` / `F1` | Mostrar/ocultar ayuda |
 | `Ctrl+L` | Redibujar pantalla |
 

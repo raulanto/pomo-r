@@ -441,10 +441,7 @@ fn render_sound_popup(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::raw("   "),
             key_hint("Esc/v"),
-            Span::styled(
-                "   Cerrar apartado",
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled("   Cerrar apartado", Style::default().fg(Color::DarkGray)),
         ]),
     ];
 
@@ -454,7 +451,9 @@ fn render_sound_popup(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(Style::default().fg(Color::DarkGray))
         .title(Span::styled(
             " 🔊 Configuración de Sonido ",
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         ));
 
     frame.render_widget(Clear, popup_area);
